@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>owl_image_queue</name>
+  <version>0.2.0</version>
+  <description>Image enqueue/processing queue gated by status/velocity topics (owl_sense-friendly)</description>
+  <maintainer email="dev@example.com">dev</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_python</buildtool_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>python3-pillow</exec_depend>
+</package>
