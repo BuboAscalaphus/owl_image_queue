@@ -28,9 +28,11 @@ class ProcessorNode(Node):
         self.results_path = gp('results_path', '').get_parameter_value().string_value
         self.results_format = gp('results_format', 'jsonl').get_parameter_value().string_value
         self.max_batch = int(gp('max_batch', 25).get_parameter_value().integer_value)
+        self.re_enqueu_failed_files = gp('re_enqueu_failed_files', 'false').get_parameter_value().string_value.lower().strip()
 
         if not self.results_path:
-            out_dir = os.path.join(self.base_dir, 'processed')
+            today = datetime.date.today().isoformat()
+            out_dir = os.path.join(self.base_dir, 'processed', today)
             os.makedirs(out_dir, exist_ok=True)
             ext = 'jsonl' if self.results_format == 'jsonl' else 'csv'
             self.results_path = os.path.join(out_dir, f'results.{ext}')
@@ -109,7 +111,18 @@ class ProcessorNode(Node):
             except Exception as e:
                 self.get_logger().warn(f"processing failed for {path}: {e}")
                 try:
-                    self.q.enqueue(path)
+                    if(self.re_enqueu_failed_files=='true'):
+                        self.q.enqueue(path)
+                    else:
+                        self.get_logger().info(f"Dropped file")
+                        rec = {
+                        'image_path': path,
+                        'processed_at': datetime.datetime.utcnow().isoformat() + 'Z',
+                        'processor': self.processor.name,
+                        'data': 'Processing Failed',
+                        }
+                        self._write_result(rec)
+                        processed += 1
                 except Exception:
                     pass
         self.get_logger().info(f"Processed {processed} images. Queue size now {self.q.size()}")

@@ -1,79 +1,94 @@
-import rclpy, os, time, fnmatch, threading
+import os, time, queue, glob
+from pathlib import PurePath
+import rclpy
 from rclpy.node import Node
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 from .sqlite_queue import ImageQueue
 
-def _is_final_write_event(event):
-    # Some writers do tmp + rename, others write in place then close.
-    # We accept both CREATED/MOVED and also detect CLOSE_WRITE-like by size-stabilization below.
-    return True
 
 class _Handler(FileSystemEventHandler):
-    def __init__(self, node, base_dir, pattern, q: ImageQueue, settle_ms=120):
+    """Watchdog handler that detects finished files and hands paths to the node thread via a Queue."""
+    def __init__(self, node: Node, base_dir: str, pattern: str, inbox: queue.Queue, settle_ms=120):
         super().__init__()
         self.node = node
         self.base_dir = os.path.abspath(base_dir)
-        self.pattern = pattern
-        self.q = q
-        self.settle_ms = settle_ms
+        self.pattern = pattern              # e.g., **/*.jpg
+        self.inbox = inbox                  # thread-safe handoff to ROS thread
+        self.settle_ms = settle_ms          # small delay to avoid partial writes
 
-    def _maybe_enqueue(self, path):
-        # match glob against filename path relative to base_dir
+    def _maybe_enqueue(self, path: str):
+        # Match '**/*.jpg' correctly across subdirectories
         rel = os.path.relpath(path, self.base_dir)
-        if not fnmatch.fnmatch(rel, self.pattern):
+        if not PurePath(rel).match(self.pattern):
             return
         if not os.path.isfile(path):
             return
-        # wait a short “settle” time to avoid partial writes
-        t0 = os.path.getsize(path)
-        time.sleep(self.settle_ms / 1000.0)
+        # Wait briefly to avoid partial writes
         try:
-            t1 = os.path.getsize(path)
+            s0 = os.path.getsize(path)
+            time.sleep(self.settle_ms / 1000.0)
+            s1 = os.path.getsize(path)
+            if s1 != s0:
+                time.sleep(self.settle_ms / 1000.0)
         except FileNotFoundError:
             return
-        if t1 != t0:
-            # grew during settle window; wait once more
-            time.sleep(self.settle_ms / 1000.0)
+        # Do NOT touch SQLite here; just queue the path for the node thread
         try:
-            self.q.enqueue(path)
-            self.node.get_logger().info(f"Enqueued {path} (queue size={self.q.size()})")
-        except Exception as e:
-            self.node.get_logger().warn(f"enqueue failed for {path}: {e}")
+            self.inbox.put_nowait(path)
+        except queue.Full:
+            self.node.get_logger().warn(f"inbox full; dropping path: {path}")
 
     def on_created(self, event):
-        if event.is_directory: 
-            return
-        self._maybe_enqueue(event.src_path)
+        if not event.is_directory:
+            self._maybe_enqueue(event.src_path)
 
     def on_moved(self, event):
-        if event.is_directory:
-            return
-        # MOVED_TO is common for atomic writers
-        self._maybe_enqueue(event.dest_path)
+        if not event.is_directory:
+            self._maybe_enqueue(event.dest_path)
 
     def on_modified(self, event):
-        # Some writers don't rename; they write then close.
-        if event.is_directory:
-            return
-        self._maybe_enqueue(event.src_path)
+        if not event.is_directory:
+            self._maybe_enqueue(event.src_path)
+
 
 class EnqueueNode(Node):
     def __init__(self):
         super().__init__('image_enqueue')
         self.base_dir = self.declare_parameter('base_dir', '/home/dev/bags').get_parameter_value().string_value
         self.pattern  = self.declare_parameter('acquisition_glob', '**/*.jpg').get_parameter_value().string_value
+
+        # SQLite queue lives under base_dir
         db_path = os.path.join(self.base_dir, 'queue.db')
         self.q = ImageQueue(db_path)
 
-        # Start watchdog observer (recursive)
+        # Thread-safe inbox for paths coming from watchdog thread
+        self._inbox = queue.Queue(maxsize=10000)
+        self._drain_timer = self.create_timer(0.2, self._drain_inbox)
+
+        # Start watchdog (recursive)
         self._observer = Observer(timeout=2.0)
-        handler = _Handler(self, self.base_dir, self.pattern, self.q)
+        handler = _Handler(self, self.base_dir, self.pattern, self._inbox)
         self._observer.schedule(handler, path=self.base_dir, recursive=True)
         self._observer.start()
 
-        self.get_logger().info(f"Watching (inotify): base_dir={self.base_dir} pattern={self.pattern} queue_db={db_path}")
+        self.get_logger().info(
+            f"Watching (inotify): base_dir={self.base_dir} pattern={self.pattern} queue_db={db_path}"
+        )
+
+    def _drain_inbox(self):
+        """Runs in the ROS node thread — safe to write to SQLite here."""
+        drained = 0
+        while not self._inbox.empty() and drained < 1000:
+            path = self._inbox.get_nowait()
+            try:
+                self.q.enqueue(path)
+                drained += 1
+            except Exception as e:
+                self.get_logger().warn(f"enqueue failed for {path}: {e}")
+        if drained:
+            self.get_logger().info(f"Enqueued {drained} new images. Queue size={self.q.size()}")
 
     def destroy_node(self):
         try:
@@ -83,6 +98,7 @@ class EnqueueNode(Node):
             pass
         super().destroy_node()
 
+
 def main(args=None):
     rclpy.init(args=args)
     node = EnqueueNode()
@@ -91,3 +107,5 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
+
