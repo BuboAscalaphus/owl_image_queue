@@ -2,12 +2,25 @@
 <package format="3">
   <name>owl_image_queue</name>
   <version>0.2.0</version>
-  <description>Image enqueue/processing queue gated by status/velocity topics (owl_sense-friendly)</description>
+  <description>Image enqueue/processing queue gated by status/velocity topics</description>
   <maintainer email="dev@example.com">dev</maintainer>
   <license>MIT</license>
+
+  <!-- Python build system -->
   <buildtool_depend>ament_python</buildtool_depend>
+
+  <!-- Runtime deps (ROS msgs + optional libs) -->
   <exec_depend>rclpy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
-  <exec_depend>python3-pillow</exec_depend>
+  <!-- If you use owl_msgs BoolStamped at runtime, add: -->
+  <!-- <exec_depend>owl_msgs</exec_depend> -->
+  <!-- Pillow is used by the example 'stats' processor -->
+  <!-- You can install via pip; no ROS dep needed -->
+  <!-- <exec_depend>python3-pil</exec_depend>  (Ubuntu package name) -->
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
 </package>
+

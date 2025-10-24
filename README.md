@@ -24,9 +24,16 @@ colcon build --symlink-install
 source ~/ws/install/setup.bash
 
 # Launch enqueue + processor
-ros2 launch owl_image_queue orchard_processing.launch.py   base_dir:=/home/dev/bags   acquisition_glob:='**/*.jpg'   status_topic:=/enabled   process_when:=false \  # process when status==false (e.g., "outside row")
-  velocity_topic:=/velocity   min_speed_mps:=-1.0 \  # set >=0 to also require |v|>=min_speed
-  processor_name:=stats   results_format:=jsonl
+ros2 launch owl_image_queue orchard_processing.launch.py \
+  base_dir:=/home/davide/ros2_ws/src/owl_bags \
+  acquisition_glob:='"**/*.jpg"' \
+  status_topic:=/enabled \
+  process_when:='"false"' \
+  velocity_topic:=/velocity \
+  min_speed_mps:=-1.0 \
+  processor_name:=stats \
+  results_format:=jsonl
+
 ```
 
 ### Key parameters
