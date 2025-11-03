@@ -1,8 +1,10 @@
 from .base import BaseProcessor
-from .noop import NoOpProcessor
+from .noop import NoopProcessor
 from .stats import StatsProcessor
+from .ultralytics_processor import UltralyticsProcessor  # <-- add this
 
 REGISTRY = {
-    'noop': NoOpProcessor,
-    'stats': StatsProcessor,
+    "noop": NoopProcessor,
+    "stats": StatsProcessor,
+    "ultralytics": UltralyticsProcessor,  # <-- add this
 }
