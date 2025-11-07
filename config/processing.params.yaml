@@ -8,8 +8,8 @@ image_processor:              # use the node/namespace your launch targets
     min_speed_mps: -1.0            # number
     processor_name: "ultralytics"
     results_format: "jsonl"
-    model: "/models/single_train.pt"
-    conf: 0.25
-    iou: 0.70
-    imgsz: 640
-
+    ultra_api_url: "http://127.0.0.1:8000/predict"
+    ultra_model: "/models/single_train.pt"
+    ultra_conf: 0.25
+    ultra_iou: 0.70
+    ultra_imgsz: 640
