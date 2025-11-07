@@ -1,0 +1,11 @@
+image_processor:              # use the node/namespace your launch targets
+  ros__parameters:
+    base_dir: "/home/dev/ws/src/owl_bags"
+    acquisition_glob: '"**/*.jpg"'   # keep quoted ⇒ string
+    status_topic: "/enabled"
+    process_when: "false"          # quoted ⇒ string (not YAML boolean)
+    velocity_topic: "/velocity"
+    min_speed_mps: -1.0            # number
+    processor_name: "ultralytics"
+    results_format: "jsonl"
+
