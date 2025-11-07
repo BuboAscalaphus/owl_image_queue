@@ -5,10 +5,11 @@ from .base import BaseProcessor
 class UltralyticsProcessor(BaseProcessor):
     name = "ultralytics"
 
+
     def setup(self, node):
         gp = node.declare_parameter
-        self.api_url = gp("ultra_api_url", "http://yolo:8000/predict").get_parameter_value().string_value
-        self.model   = gp("ultra_model",   "yolov8n.pt").get_parameter_value().string_value
+        self.api_url = gp("ultra_api_url", "http://127.0.0.1:8000/predict").get_parameter_value().string_value
+        self.model   = gp("ultra_model",   "/models/finetuned.pt").get_parameter_value().string_value
         self.conf    = float(gp("ultra_conf", 0.25).get_parameter_value().double_value)
         self.iou     = float(gp("ultra_iou",  0.70).get_parameter_value().double_value)
         self.imgsz   = int(gp("ultra_imgsz", 640).get_parameter_value().integer_value)

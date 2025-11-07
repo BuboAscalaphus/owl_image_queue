@@ -1,4 +1,6 @@
 from setuptools import setup, find_packages
+from glob import glob
+import os
 
 package_name = 'owl_image_queue'
 
@@ -9,7 +11,9 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages', [f'resource/{package_name}']),
         (f'share/{package_name}', ['package.xml']),
-        (f'share/{package_name}', ['launch/orchard_processing.launch.py']),
+        (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
+        (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
+
     ],
     install_requires=[
         'setuptools',
